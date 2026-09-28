@@ -7,3 +7,7 @@ __pycache__/
 tools/learned.json
 .ruff_cache/
 .pytest_cache/
+.agora-demo/
+.agora/
+.env.agora
+node_modules/

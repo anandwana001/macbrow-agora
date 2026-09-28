@@ -4,6 +4,30 @@ Talk to your Mac. Say a command and it runs as AppleScript; say a web task and i
 your Chrome. Routing takes about 300 ms because a System One model *chooses* instead of
 generating.
 
+## Agora Conversational AI demo
+
+**Status:** implementation, offline tests and browser build verified. End-to-end
+voice and Mac tool execution still need a Jev key and a configured HTTPS tunnel.
+
+Use **Agora's managed STT → LLM → TTS pipeline** with the `agora-agents` npm
+module. Agora's LLM handles conversation and calls an MCP tool to run the existing
+Jev-powered Mac actions. The browser shows transcripts, agent state and latency.
+
+```bash
+./agora.sh setup
+# Configure Agora credentials + HTTPS MCP URL in .env.agora and Jev in .env.local.
+./agora.sh start
+```
+
+Open **http://localhost:3000** and try “Open Chrome” or “Turn the volume down”.
+The default demo requires only Agora and Jev credentials; autonomous browser
+tasks and new-tool generation are optional extensions with their original LLM
+requirements. See **[Agora setup and verification](agora/README.md)** for the
+HTTPS tunnel, credentials and feature scope.
+
+The sections below describe the original LiveKit/Gradium entrypoint, which remains
+available through `console.sh`.
+
 [![macbrow demo](https://img.youtube.com/vi/cPBlb1neXiI/maxresdefault.jpg)](https://youtu.be/cPBlb1neXiI)
 
 *Demo video: [youtu.be/cPBlb1neXiI](https://youtu.be/cPBlb1neXiI)*
