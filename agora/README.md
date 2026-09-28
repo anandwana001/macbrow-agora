@@ -21,44 +21,15 @@ Browser mic ←→ Agora RTC + managed STT/LLM/TTS
 
 ## Setup
 
-Prerequisites: macOS, Python 3.12+, uv, Node 22+, npm, Bun, Agora credentials,
-and a TypeSafe/Jev key. Run from the repository root:
+Follow the [step-by-step setup and running guide](../README.md#setup-and-running-the-demo)
+in the root README. It covers credentials, ngrok and Cloudflare tunnel commands,
+which terminals to keep running, connectivity checks, starting a conversation,
+shutdown and troubleshooting.
 
-```bash
-./agora.sh setup
-cp agora/.env.example .env.agora
-```
-
-Set `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE` in `.env.agora`, and
-`TYPESAFE_API_KEY` in `.env.local`. Keep both files private. Enable RTC, RTM and
-Conversational AI in the Agora project. `agora project doctor <project>` checks
-project readiness; it does not verify a live conversation.
-
-The Mac tool endpoint must be reachable by Agora. If you have Cloudflare Tunnel
-installed, run this in a separate terminal:
-
-```bash
-cloudflared tunnel --url http://127.0.0.1:8101
-```
-
-Set `MACBROW_MCP_URL=https://<the-assigned-host>/mcp` in `.env.agora`.
-Keep the tunnel running; update the URL when it changes. Another HTTPS tunnel
-works too, provided it forwards Authorization headers and supports MCP HTTP.
-Tunnel **only port 8101**. Port 8000 issues tokens and starts/stops agents and
-must remain local. The tool endpoint requires a random per-conversation bearer
-token that the Node server supplies to Agora; it is revoked when the session ends.
-
-```bash
-./agora.sh start
-```
-
-Open **http://localhost:3000**, allow microphone access, and start a conversation.
-macOS may ask for Automation permission when an app is controlled for the first time.
-
-Try “Open Chrome”, “Open agora.io”, “What tab am I on?”, and “Turn the volume down”.
-Ordinary questions use Agora's managed LLM. Answer the tool's confirmation prompts
-normally. Use **End Conversation** or say “stop listening”; Ctrl-C also stops the
-agent and worker. One conversation controls this Mac at a time, capped at 30 minutes.
+The Node server supplies Agora with a random per-conversation MCP bearer token;
+it is revoked when the session ends. One conversation controls this Mac at a time,
+capped at 30 minutes. The tunnel exposes port 8101 only; the browser and control
+API stay local.
 
 ## Scope
 
