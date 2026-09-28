@@ -22,3 +22,31 @@ The original Python quickstart was installed with `bun run setup` and started
 with `bun run dev`. Its page and token API loaded, and a managed agent started
 and stopped successfully. This is not proof of microphone/audio roundtrip or of
 the new Mac tool integration; those require separate live verification.
+
+## Native terminal voice client
+
+- `AgoraIO/AgoraRtcEngine_macOS` **4.6.4**, revision
+  `954d9f604c1aa95da1662beb6e6a4db0e091c7f1`: official SwiftPM `RtcBasic`
+  package and compiled SDK headers supply the macOS audio API. `Package.resolved`
+  pins its AgoraInfra dependency too. SDK binaries are downloaded into ignored
+  build output and remain subject to Agora's SDK terms; they are not relicensed
+  under this fork's MIT license.
+- `AgoraIO/API-Examples` revision
+  `e40e6e13b2ea79b6a420fc490f40fa185c26f358`,
+  `macOS/APIExample/Examples/Basic/JoinChannelVideo/JoinChannelVideo.swift`:
+  inspected engine initialization, channel media options, join/leave and delegate
+  callbacks. `native/Sources/MacbrowAudio/main.swift` adapts that lifecycle to a
+  windowless, microphone-only client with permission handling and parent-pipe cleanup.
+- `agora-agent-client-toolkit` **2.10.0**, already pinned by the official browser
+  quickstart: `dist/index.mjs` (`src/messaging/chunked.ts`, RTC stream handler and
+  transcript types) supplies the wire-format reference for `transcripts.mjs`.
+  The console uses bounded chunk reassembly and prints completed transcript text,
+  without the toolkit's browser word-timing renderer. The package's MIT notice is
+  preserved in `AGORA-TOOLKIT-LICENSE`.
+- Official API schema above: `parameters.data_channel: datastream` selects RTC
+  messages for the native console. The optional browser retains `rtm`.
+
+A native console smoke check successfully joined RTC, started a managed agent,
+received its greeting audio and transcript, and stopped both clients. Microphone
+capture and speaker output were disabled. This does not prove audible playback,
+live user speech or real Mac action execution.

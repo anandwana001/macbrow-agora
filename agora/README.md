@@ -1,8 +1,9 @@
 # macbrow with Agora Conversational AI
 
-**Verification status:** offline tests and the browser build pass. The official
-baseline's managed agent starts/stops successfully; the integrated voice-to-Mac
-roundtrip has not yet been verified with a Jev key and HTTPS tunnel.
+**Verification status:** offline tests and native builds pass. The native console
+has joined Agora, received agent audio and a greeting transcript, and shut down
+successfully in a microphone-muted, playback-muted smoke check. Spoken Mac
+commands and audible replies still need live acceptance testing.
 
 Agora provides the managed **STT → LLM → TTS** pipeline via the **`agora-agents`
 npm module**. Its LLM calls `run_mac_command` over MCP; a persistent Python
@@ -12,7 +13,7 @@ the default demo. This fork is for experimentation only; see the [original-proje
 and Gradium credits](../README.md#credits-and-original-work).
 
 ```text
-Browser mic ←→ Agora RTC + managed STT/LLM/TTS
+Native Mac audio ←→ Agora RTC + managed STT/LLM/TTS
                            ↓ MCP tool call
                  HTTPS tunnel → Node MCP server (:8101)
                            ↓ private stdin/stdout
@@ -28,8 +29,18 @@ shutdown and troubleshooting.
 
 The Node server supplies Agora with a random per-conversation MCP bearer token;
 it is revoked when the session ends. One conversation controls this Mac at a time,
-capped at 30 minutes. The tunnel exposes port 8101 only; the browser and control
-API stay local.
+capped at 30 minutes. The tunnel exposes port 8101 only; the control API stays local.
+
+`./console.sh start` (also `./agora.sh start`) runs in the foreground with native
+microphone/speaker audio. `console.mjs` starts the existing control/MCP server,
+gives short-lived RTC credentials to a Swift helper over stdin, waits for it to
+join, then starts the managed agent. Certificates and Jev keys stay in the backend.
+The native client uses RTC data-stream transcripts; the optional browser continues
+to use RTM. `agora-agents` supplies the cloud agent; the pinned Agora macOS SDK
+supplies native audio. There is no local STT/TTS replacement or browser subprocess.
+
+Use `./agora.sh browser-setup` and `./agora.sh browser` only if you want the optional
+web UI. Its Bun/Next.js dependencies are not needed for the console.
 
 ## Scope
 
@@ -60,7 +71,7 @@ uv run pytest -q
 
 Tests use fake cloud sessions and Mac workers, so they do not operate your Mac.
 For live acceptance, verify spoken replies and transcripts, then a real Mac
-command, confirmation/cancellation, and End Conversation. An accepted agent
+command, confirmation/cancellation, spoken stop and Ctrl-C shutdown. An accepted agent
 start alone does not prove the audio or MCP path works.
 
 See [SOURCES.md](SOURCES.md) for the quickstart copy map and [the root README](../README.md)

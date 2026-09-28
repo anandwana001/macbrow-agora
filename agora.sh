@@ -7,7 +7,10 @@ sample="$PWD/.agora-demo/agent-quickstart-python"
 revision=bd1af724bed885c39a5a57235b37ec3bb3fd6396
 
 case "${1:-start}" in
-  setup)
+  setup) exec ./console.sh setup ;;
+  start|console) exec ./console.sh start ;;
+  smoke) exec ./console.sh smoke ;;
+  browser-setup)
     uv sync
     npm --prefix agora ci
     if [[ ! -d "$sample" ]]; then
@@ -31,9 +34,9 @@ p.write_text(s)
 PY
     echo 'Setup complete. Configure .env.agora and TYPESAFE_API_KEY in .env.local; see agora/README.md.'
     ;;
-  start)
+  browser)
     [[ -d "$sample/node_modules" && -d agora/node_modules && -f .env.agora ]] || {
-      echo 'Run ./agora.sh setup, then configure .env.agora. See agora/README.md.' >&2
+      echo 'Run ./agora.sh browser-setup, then configure .env.agora. See agora/README.md.' >&2
       exit 1
     }
     node agora/server.mjs &
@@ -53,5 +56,5 @@ PY
     echo 'Open http://localhost:3000. Keep the HTTPS tunnel to port 8101 running.'
     while kill -0 "$backend" 2>/dev/null && kill -0 "$frontend" 2>/dev/null; do sleep 1; done
     ;;
-  *) echo 'Usage: ./agora.sh [setup|start]' >&2; exit 2 ;;
+  *) echo 'Usage: ./agora.sh [setup|start|smoke|browser-setup|browser]' >&2; exit 2 ;;
 esac

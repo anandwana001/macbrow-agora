@@ -11,3 +11,5 @@ tools/learned.json
 .agora/
 .env.agora
 node_modules/
+agora/native/.build/
+agora/native/.swiftpm/

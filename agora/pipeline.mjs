@@ -18,7 +18,7 @@ The default demo supports predefined app, URL, tab and volume commands. Autonomo
 website tasks and learning new actions are optional and may be unavailable.
 If stop is true, say the tool's goodbye; the session will end automatically.`;
 
-export function buildAgent(client, endpoint, secret) {
+export function buildAgent(client, endpoint, secret, { dataChannel = 'rtm' } = {}) {
   const greeting = 'macbrow ready, powered by Agora. Try asking me to open Chrome.';
   return new Agent({
     client, instructions: INSTRUCTIONS, greeting,
@@ -30,7 +30,7 @@ export function buildAgent(client, endpoint, secret) {
       end_of_speech: { mode: 'vad', vad_config: { silence_duration_ms: 480 } },
     } },
     advancedFeatures: { enable_rtm: true, enable_tools: true },
-    parameters: { audio_scenario: 'chorus', data_channel: 'rtm', enable_error_message: true, enable_metrics: true },
+    parameters: { audio_scenario: 'chorus', data_channel: dataChannel, enable_error_message: true, enable_metrics: true },
   })
     .withStt(new DeepgramSTT({ model: 'nova-3', language: 'en' }))
     .withLlm(new OpenAI({

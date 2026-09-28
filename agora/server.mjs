@@ -44,7 +44,8 @@ export function authorized(header, secret) {
 }
 
 export function createDemo({ appId, appCertificate, endpoint, root = ROOT,
-  workerFactory = () => new MacWorker(root), sessionFactory, tokenFactory = generateConvoAIToken } = {}) {
+  workerFactory = () => new MacWorker(root), sessionFactory, tokenFactory = generateConvoAIToken,
+  dataChannel = 'rtm', onAction = () => {} } = {}) {
   if (!appId || !appCertificate) throw new Error('Configure Agora credentials in .env.agora');
   if (!endpoint) throw new Error('Set MACBROW_MCP_URL in .env.agora to your HTTPS tunnel URL with /mcp appended');
   if (new URL(endpoint).protocol !== 'https:') throw new Error('MACBROW_MCP_URL must be an HTTPS endpoint ending in /mcp');
@@ -91,6 +92,7 @@ export function createDemo({ appId, appCertificate, endpoint, root = ROOT,
     const result = current.queue.then(async () => {
       if (active !== current || current.stopping) throw fail(410, 'Conversation ended');
       const outcome = await current.worker.run(utterance);
+      onAction({ utterance, ...outcome });
       if (outcome.stop) {
         current.stopping = true;
         current.goodbye = setTimeout(() => stop().catch(logError), 5000);
@@ -141,7 +143,7 @@ export function createDemo({ appId, appCertificate, endpoint, root = ROOT,
         active = current; // reserve the Mac before awaiting startup
         current.started = (async () => {
           await current.worker.ready;
-          current.session = sessionFactory ? sessionFactory(current) : buildAgent(client, endpoint, current.secret)
+          current.session = sessionFactory ? sessionFactory(current) : buildAgent(client, endpoint, current.secret, { dataChannel })
             .createSession({ channel: issued.channel_name, agentUid: issued.agent_uid,
               remoteUids: [issued.uid], idleTimeout: 30, expiresIn: 3600 });
           current.agentId = await current.session.start();
