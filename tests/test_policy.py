@@ -124,14 +124,16 @@ def test_allows_intended_actions():
 
 def test_hostnames_are_not_dotfiles():
     for url in [
-        "https://docs.livekit.io",
+        "https://docs.agora.io",
         "https://claude.ai",
         "https://open.spotify.com",
         "https://x.com",
         "https://app.slack.com",
     ]:
         assert policy.check(f'tell application "Safari" to open location "{url}"') == [], url
-    assert policy.check('do shell script "open ~/.livekit/cli-config.yaml"')
+    assert policy.check('do shell script "open ~/.agora/cli-config.yaml"')
+    assert policy.check('do shell script "open ~/.env.agora"')
+    assert policy.check('do shell script "open ~/.some-provider/credentials"')
     assert policy.check('do shell script "open /Users/me/.claude/settings.json"')
 
 

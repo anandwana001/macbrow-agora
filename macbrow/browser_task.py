@@ -7,7 +7,7 @@ TYPE_TEXT. We add three things on top:
 1. Profile pinning: the working tab is created inside the Chrome profile macbrow is
    configured for (see chrome.py), found by opening a probe URL in that profile through
    `open -na` and reading the probe tab's browserContextId over CDP.
-2. Text helper on our own LLM backend (LiveKit Inference or LM Studio) instead of the
+2. Text helper on an optional local model served by LM Studio instead of the
    upstream OpenRouter/DeepSeek helper, with a strict JSON schema.
 3. A wall-clock budget, progress callbacks for the voice layer, and a spoken summary.
 
@@ -214,91 +214,28 @@ async def compose_goal(utterance: str, context: dict[str, Any]) -> ComposedGoal:
 
 
 def _structured_sync(system: str, user: str, cls: type[BaseModel]) -> str:
-    """One structured-output completion on the configured LLM backend; returns the raw JSON text."""
-    from .generator import LMSTUDIO_BASE_URL, PROVIDER  # late import: generator pulls livekit
+    """One structured-output completion on the optional local model."""
+    from . import local_llm
 
-    if PROVIDER == "livekit":
-        from livekit.agents import inference, llm
-
-        async def go() -> str:
-            m = inference.LLM(
-                model=os.environ.get("MACBROW_CHAT_MODEL", "openai/gpt-5-mini"),
-                extra_kwargs={"reasoning_effort": "minimal"},
-            )
-            try:
-                ctx = llm.ChatContext()
-                ctx.add_message(role="system", content=system)
-                ctx.add_message(role="user", content=user)
-                async with m.chat(chat_ctx=ctx, response_format=cls) as stream:
-                    return "".join([c async for c in stream.to_str_iterable()])
-            finally:
-                await m.aclose()
-
-        return _run_coro_blocking(go())
-    import openai
-    from livekit.agents.llm import utils as llm_utils
-
-    client = openai.OpenAI(
-        base_url=LMSTUDIO_BASE_URL, api_key=os.environ.get("LMSTUDIO_API_KEY", "lm-studio"), timeout=30
-    )
-    resp = client.chat.completions.create(
-        model=os.environ.get("MACBROW_CHAT_MODEL", "qwen/qwen3.5-9b"),
-        max_tokens=400,
-        temperature=0.2,
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-        response_format=llm_utils.to_openai_response_format(cls),  # type: ignore[arg-type]
-        extra_body={"reasoning_effort": "none"},
-    )
-    return resp.choices[0].message.content or ""
+    return local_llm.complete(system, user, cls)
 
 
 def _field_text_sync(context: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    """Replacement for jev_ultrafast.model.field_text: same contract, our LLM backend."""
+    """Use the optional local model to fill browser text fields."""
     from jev_ultrafast.questions import TEXT_VALUE
 
-    from .generator import LMSTUDIO_BASE_URL, PROVIDER  # late import: generator pulls livekit
+    from . import local_llm
 
     started = time.perf_counter()
-    if PROVIDER == "livekit":
-        from livekit.agents import inference, llm
-
-        async def go() -> str:
-            m = inference.LLM(
-                model=os.environ.get("MACBROW_CHAT_MODEL", "openai/gpt-5-mini"),
-                extra_kwargs={"reasoning_effort": "minimal"},
-            )
-            try:
-                ctx = llm.ChatContext()
-                ctx.add_message(role="system", content=TEXT_VALUE)
-                ctx.add_message(role="user", content=json.dumps(context))
-                async with m.chat(chat_ctx=ctx, response_format=FieldText) as stream:
-                    return "".join([c async for c in stream.to_str_iterable()])
-            finally:
-                await m.aclose()
-
-        raw = _run_coro_blocking(go())
-        model_name = os.environ.get("MACBROW_CHAT_MODEL", "openai/gpt-5-mini")
-    else:
-        import openai
-        from livekit.agents.llm import utils as llm_utils
-
-        client = openai.OpenAI(
-            base_url=LMSTUDIO_BASE_URL, api_key=os.environ.get("LMSTUDIO_API_KEY", "lm-studio"), timeout=30
-        )
-        model_name = os.environ.get("MACBROW_CHAT_MODEL", "qwen/qwen3.5-9b")
-        resp = client.chat.completions.create(
-            model=model_name,
-            max_tokens=300,
-            temperature=0.2,
-            messages=[{"role": "system", "content": TEXT_VALUE}, {"role": "user", "content": json.dumps(context)}],
-            response_format=llm_utils.to_openai_response_format(FieldText),  # type: ignore[arg-type]
-            extra_body={"reasoning_effort": "none"},
-        )
-        raw = resp.choices[0].message.content or ""
+    raw = local_llm.complete(TEXT_VALUE, json.dumps(context), FieldText, max_tokens=300)
     value = FieldText.model_validate_json(raw).text
     if not value or not value.strip() or len(value) > 2000:
         raise ValueError("Text helper returned no valid field value; nothing typed.")
-    return value, {"model": model_name, "latency_ms": round((time.perf_counter() - started) * 1000), "usage": {}}
+    return value, {
+        "model": local_llm.model_name(),
+        "latency_ms": round((time.perf_counter() - started) * 1000),
+        "usage": {},
+    }
 
 
 # ------------------------------------------------------------------------ profile-pinned tab
@@ -627,18 +564,6 @@ def _log_decisions(state: dict[str, Any], n: int = 8) -> None:
             d.get("confidence", 0),
             label[:70],
         )
-
-
-def _run_coro_blocking(coro: Any) -> Any:
-    """Run a coroutine to completion from sync code, whether or not this thread has a running loop."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    from concurrent.futures import ThreadPoolExecutor
-
-    with ThreadPoolExecutor(max_workers=1) as ex:
-        return ex.submit(asyncio.run, coro).result(timeout=60)
 
 
 def _with_timeout(fn: Callable[[], Any], seconds: float) -> Any:

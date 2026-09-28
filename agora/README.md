@@ -7,8 +7,9 @@ roundtrip has not yet been verified with a Jev key and HTTPS tunnel.
 Agora provides the managed **STT → LLM → TTS** pipeline via the **`agora-agents`
 npm module**. Its LLM calls `run_mac_command` over MCP; a persistent Python
 worker sends the user's command through the existing Jev router and Mac policy.
-Small talk stays inside Agora. No Gradium or separate OpenAI key is needed for
-the default demo.
+Small talk stays inside Agora. No separate speech or chat-model key is needed for
+the default demo. This fork is for experimentation only; see the [original-project
+and Gradium credits](../README.md#credits-and-original-work).
 
 ```text
 Browser mic ←→ Agora RTC + managed STT/LLM/TTS
@@ -67,10 +68,12 @@ the user's words, not arbitrary script text. Duplicate tool calls with the same
 `turn_id` reuse the first result; failures are not automatically replayed.
 
 `MACBROW_AGORA_EXTENDED=1` restores the original autonomous browser and learning
-features. Those helpers still depend on the original app's LLM settings in the
-root `.env.example` (LiveKit Inference or LM Studio), in addition to Jev. They are
-off by default so the standard Agora demo needs only Agora and Jev credentials.
-Generated tools and browser workflows retain their existing limitations.
+features. Those helpers use a local model through LM Studio, in addition to Jev. Set
+`MACBROW_LOCAL_MODEL` to the loaded model ID and, if needed, `LMSTUDIO_BASE_URL`
+and `LMSTUDIO_API_KEY` in `.env.local`; see the root `.env.example`. For browser
+experiments, enable Chrome remote debugging at `chrome://inspect/#remote-debugging`.
+These features are off by default so the standard Agora demo needs only Agora and
+Jev credentials. Generated tools and browser workflows remain experimental.
 
 This local prototype is not a multi-user hosted service. The managed LLM is
 instructed to forward exact utterances and confirmations; speech recognition and
@@ -89,5 +92,5 @@ For live acceptance, verify spoken replies and transcripts, then a real Mac
 command, confirmation/cancellation, and End Conversation. An accepted agent
 start alone does not prove the audio or MCP path works.
 
-See [SOURCES.md](SOURCES.md) for the quickstart copy map. The original LiveKit
-entrypoint and `console.sh` remain available.
+See [SOURCES.md](SOURCES.md) for the quickstart copy map and [the root README](../README.md)
+for upstream attribution and the experimental scope of this fork.

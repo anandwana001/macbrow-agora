@@ -1,12 +1,12 @@
-"""macbrow: voice-controlled macOS agent.
-
-LiveKit Agents (Gradium STT/TTS) -> Jev (TypeSafe System One) routes each
-utterance to an AppleScript tool in ~150ms -> osascript executes it. Unknown
-requests fall back to an LLM, which writes a new AppleScript tool that is
-cached in the registry so the next request is fast. Multi-step website work
-is delegated to jev-ultrafast (Browser Use x TypeSafe) inside the user's Chrome.
-"""
+"""Experimental Agora voice-to-Mac demo with Jev-routed AppleScript tools."""
 
 __all__ = ["DynamicMacAgent"]
 
-from .agent import DynamicMacAgent
+
+def __getattr__(name):
+    # Entrypoints must load environment settings before importing the Mac engine.
+    if name == "DynamicMacAgent":
+        from .agent import DynamicMacAgent
+
+        return DynamicMacAgent
+    raise AttributeError(name)

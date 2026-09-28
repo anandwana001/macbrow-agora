@@ -18,7 +18,7 @@ def test_span_candidates_respects_budget():
 
 def test_clean_value_normalises_spoken_urls():
     assert _clean_value(" github dot com ") == "github.com"
-    assert _clean_value('"docs dot livekit dot io slash agents"') == "docs.livekit.io/agents"
+    assert _clean_value('"docs dot agora dot io slash agents"') == "docs.agora.io/agents"
 
 
 def test_clean_value_strips_trailing_punctuation():

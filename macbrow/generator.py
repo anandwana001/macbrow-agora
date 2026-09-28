@@ -1,7 +1,7 @@
 """Fallback tier: an LLM writes a new AppleScript tool for an unseen request.
 
-Default backend is LiveKit Inference (hosted, billed to your LiveKit Cloud project; needs
-LIVEKIT_URL/API_KEY/API_SECRET). Set MACBROW_LLM_PROVIDER=lmstudio to use a local model instead.
+Optional local-model experiment, disabled in the default Agora demo.
+Set MACBROW_LOCAL_MODEL to the model served by LM Studio before enabling it.
 
 Runs once per novel intent (a couple of seconds); the result is persisted to
 ``tools/learned.json`` so Jev routes to it in ~150ms next time. Generated tools
@@ -20,23 +20,15 @@ import tempfile
 from typing import Any, Literal
 
 import openai
-from livekit.agents import inference, llm
-from livekit.agents.llm import utils as llm_utils
 from pydantic import BaseModel, Field
 from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul
 
-from . import policy
+from . import local_llm, policy
 from .applescript import MacContext
 from .registry import BUILTIN_PLACEHOLDERS, RISKY_PATTERNS, ArgSpec, PolicyError, Tool, ToolRegistry
 
 log = logging.getLogger("macbrow.generator")
 
-PROVIDER = os.environ.get("MACBROW_LLM_PROVIDER", "livekit")  # "livekit" | "lmstudio"
-LMSTUDIO_BASE_URL = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
-MODEL = os.environ.get("MACBROW_CODEGEN_MODEL", "openai/gpt-5-mini" if PROVIDER == "livekit" else "qwen/qwen3.5-9b")
-# LiveKit/OpenAI: "low" is plenty for short scripts. LM Studio + Qwen 3.5: "none", otherwise the
-# model spends the whole budget in the reasoning channel and returns empty text.
-REASONING_EFFORT = os.environ.get("MACBROW_REASONING_EFFORT", "low" if PROVIDER == "livekit" else "none")
 MAX_ATTEMPTS = int(os.environ.get("MACBROW_CODEGEN_ATTEMPTS", "3"))  # first draft + compiler-guided repairs
 MAX_OUTPUT_TOKENS = int(os.environ.get("MACBROW_CODEGEN_MAX_TOKENS", "1500"))  # bounds a runaway generation
 # Jev reviews each compiled script: p(script really performs the request). Below this it is sent
@@ -96,9 +88,7 @@ class GeneratedTool(BaseModel):
     examples: list[str] = Field(description="2-4 alternative phrasings of the request.")
 
 
-# OpenAI-style response_format dict, used for the LM Studio path (LiveKit takes the class directly).
-TOOL_RESPONSE_FORMAT: dict[str, Any] = llm_utils.to_openai_response_format(GeneratedTool)
-
+TOOL_RESPONSE_FORMAT: dict[str, Any] = local_llm.response_format(GeneratedTool)
 
 SYSTEM = """You write a NEW AppleScript tool for a voice-controlled macOS assistant.
 
@@ -154,18 +144,8 @@ class ToolGenerator:
     ):
         self.registry = registry
         self.jev = jev
-        self.provider = PROVIDER if client is None else "lmstudio"
-        self.client: openai.AsyncOpenAI | None = None
-        self.lk_llm: inference.LLM | None = None
-        if self.provider == "livekit":
-            self.lk_llm = inference.LLM(model=MODEL, extra_kwargs={"reasoning_effort": REASONING_EFFORT})
-        else:
-            self.client = client or openai.AsyncOpenAI(
-                base_url=LMSTUDIO_BASE_URL,
-                api_key=os.environ.get("LMSTUDIO_API_KEY", "lm-studio"),
-                timeout=90.0,
-                max_retries=1,
-            )
+        self.model = os.getenv("MACBROW_CODEGEN_MODEL") or local_llm.model_name()
+        self.client = client or openai.AsyncOpenAI(**local_llm.client_options())
 
     async def generate(self, utterance: str, ctx: MacContext) -> tuple[Tool | None, str]:
         """Returns (tool, spoken_message). tool is None when generation failed.
@@ -281,26 +261,14 @@ class ToolGenerator:
 
     async def _complete(self, messages: list[dict[str, str]]) -> tuple[str, str]:
         """One structured-output completion on the configured backend -> (text, finish_reason)."""
-        if self.lk_llm is not None:
-            ctx = llm.ChatContext()
-            for m in messages:
-                ctx.add_message(role=m["role"], content=m["content"])  # type: ignore[arg-type]
-            try:
-                stream = self.lk_llm.chat(chat_ctx=ctx, response_format=GeneratedTool)
-                async with stream:
-                    parts = [c async for c in stream.to_str_iterable()]
-            except Exception as e:  # APIConnectionError, APIStatusError, auth errors
-                raise _Unavailable(f"LiveKit Inference request failed: {_short(e)}") from e
-            return "".join(parts), "stop"
-        assert self.client is not None
         try:
             resp = await self.client.chat.completions.create(
-                model=MODEL,
+                model=self.model,
                 max_tokens=MAX_OUTPUT_TOKENS,
                 temperature=0.2,
                 messages=messages,  # type: ignore[arg-type]
                 response_format=TOOL_RESPONSE_FORMAT,  # type: ignore[arg-type]
-                extra_body={"reasoning_effort": REASONING_EFFORT},
+                extra_body=local_llm.extra_body(),
             )
         except openai.APIConnectionError as e:
             raise _Unavailable("The local model server isn't running, so I can't learn that action.") from e
@@ -309,10 +277,7 @@ class ToolGenerator:
         return resp.choices[0].message.content or "", resp.choices[0].finish_reason or ""
 
     async def aclose(self) -> None:
-        if self.lk_llm is not None:
-            await self.lk_llm.aclose()
-        if self.client is not None:
-            await self.client.close()
+        await self.client.close()
 
     async def find_duplicate(self, new_tool: Tool, available: list[Tool]) -> Tool | None:
         """If an existing available tool already does what the new one does, return it.
@@ -419,11 +384,6 @@ DUPLICATE = "__duplicate__"  # generate() message meaning: returned tool is an e
 
 class _Unavailable(RuntimeError):
     """The codegen backend could not serve the request; message is user-speakable."""
-
-
-def _short(e: BaseException, n: int = 120) -> str:
-    msg = str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__
-    return msg if len(msg) <= n else msg[: n - 1] + "…"
 
 
 async def _compiles(script: str) -> tuple[bool, str]:

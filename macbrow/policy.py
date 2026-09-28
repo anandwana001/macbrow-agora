@@ -97,9 +97,10 @@ SHELL_INJECTION = re.compile(r"[;&|`$><]")  # no chaining, pipes, subshells or r
 BLOCKED_PATHS = re.compile(
     r"(~?/(Library|System|usr|etc|private|var|bin|sbin|opt|cores|Volumes/[^/\s\"']+/(System|Library))\b|"
     r"~/Library|/Applications/Utilities|/Applications/Python|"
-    # dotfiles/dirs: the dot must start a path segment (not a hostname like docs.livekit.io)
+    # Hidden path segments and known config names; allow hostnames and extensions like ".png".
+    r"/\.[a-z_][\w-]*\b|"
     r"(?<![\w.-])\.(zshrc|zprofile|zshenv|bashrc|bash_profile|profile|gitconfig|npmrc|pypirc|netrc|"
-    r"ssh|aws|gnupg|config|claude|venv|pyenv|local|cargo|rustup|docker|kube|lmstudio|livekit)\b(?![\w-])|"
+    r"ssh|aws|gnupg|config|claude|venv|pyenv|local|cargo|rustup|docker|kube|lmstudio|agora|env)\b(?![\w-])|"
     r"site-packages|pyproject\.toml|requirements\.txt|package\.json|uv\.lock|poetry\.lock|"
     r"Homebrew|/opt/homebrew|node_modules|\.plist\b|LaunchAgents|LaunchDaemons|Keychains)",
     re.IGNORECASE,

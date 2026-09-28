@@ -65,6 +65,10 @@ async def main() -> None:
     if not policy.ENABLED:
         raise RuntimeError("The Agora Mac-control demo requires MACBROW_POLICY=strict")
     extended = os.getenv("MACBROW_AGORA_EXTENDED", "0") == "1"
+    if extended:
+        from .local_llm import model_name
+
+        model_name()  # fail clearly before accepting a command if no model is configured
     registry = ToolRegistry()
     if not extended:
         registry.tools = {k: t for k, t in registry.tools.items() if t.runner != "browser" and t.source == "seed"}

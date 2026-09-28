@@ -10,18 +10,21 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import sys
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 
-from .agent import DynamicMacAgent
+if TYPE_CHECKING:
+    from .agent import DynamicMacAgent
 
 
 async def _main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(prog="macbrow")
     ap.add_argument("utterance", nargs="*")
     ap.add_argument("--dry", action="store_true", help="route only; do not execute or learn")
-    ap.add_argument("--no-learn", action="store_true", help="disable the LLM tool-generation fallback")
+    ap.add_argument("--learn", action="store_true", help="enable optional local-model tool generation")
     ap.add_argument("--policy", action="store_true", help="list every tool with its policy status and exit")
     ap.add_argument("-v", "--verbose", action="store_true")
     ns = ap.parse_args(argv)
@@ -41,7 +44,16 @@ async def _main(argv: list[str]) -> int:
                 f"  {'BLOCKED ' if t.blocked else 'allowed '} {t.source:7s} {t.name:28s} {'' if not t.blocked else '; '.join(t.blocked_by)}"
             )
         return 0
-    agent = DynamicMacAgent(enable_learning=not (ns.no_learn or ns.dry))
+    from .agent import DynamicMacAgent
+    from .registry import ToolRegistry
+
+    extended = os.getenv("MACBROW_AGORA_EXTENDED", "0") == "1"
+    if ns.learn and not extended:
+        ap.error("--learn requires MACBROW_AGORA_EXTENDED=1 and MACBROW_LOCAL_MODEL")
+    registry = ToolRegistry()
+    if not extended:
+        registry.tools = {k: t for k, t in registry.tools.items() if t.runner != "browser" and t.source == "seed"}
+    agent = DynamicMacAgent(registry, enable_learning=ns.learn and not ns.dry)
     await agent.start()
     try:
         if ns.utterance:
