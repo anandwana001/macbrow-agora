@@ -57,6 +57,8 @@ test('managed pipeline uses MCP while leaving all vendor API keys omitted', () =
   assert.equal(config.tts.api_key, undefined);
   assert.equal(config.llm.mcp_servers[0].headers.Authorization, 'Bearer session-secret');
   assert.deepEqual(config.llm.mcp_servers[0].allowed_tools, ['run_mac_command']);
+  assert.ok(config.llm.mcp_servers[0].timeout_ms >= 1000);
+  assert.ok(config.llm.mcp_servers[0].timeout_ms <= 100000);
   assert.equal(config.advancedFeatures.enable_tools, true);
 });
 

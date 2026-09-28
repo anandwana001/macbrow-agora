@@ -39,7 +39,8 @@ export function buildAgent(client, endpoint, secret) {
       mcpServers: [{
         name: 'macbrow', endpoint, transport: 'streamable_http',
         headers: { Authorization: `Bearer ${secret}` },
-        allowed_tools: ['run_mac_command'], timeout_ms: 110000,
+        // Agora validates MCP timeouts in the range 1,000–100,000 ms.
+        allowed_tools: ['run_mac_command'], timeout_ms: 100000,
       }],
     }))
     .withTts(new MiniMaxTTS({ model: 'speech_2_6_turbo', voiceId: 'English_captivating_female1' }));
